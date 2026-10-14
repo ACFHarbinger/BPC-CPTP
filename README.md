@@ -89,12 +89,14 @@ result = cptp.solve(
 
 ## Benchmarks
 
+Proven optimal within a 3600 s limit per instance (HiGHS v1.15.0), as reported in the paper ([arXiv:2607.04497](https://arxiv.org/abs/2607.04497)):
+
 | Set | Instances | Solved | Rate |
 |---|--:|--:|--:|
-| SPPRCLIB (45 instances, 45–262 nodes) | 45 | 45 | 100% |
-| Roberti Set 3 (31 instances, 45–200 nodes, 3600s) | 31 | 27 | 87% |
+| SPPRCLIB (45–262 nodes) | 45 | 45 | 100% |
+| Roberti Set 3 (45–200 nodes) | 31 | 24 | 77% |
 
-See `benchmarks/` for full results and reproduction scripts.
+Per-instance results are in `benchmarks/cptp.csv`; see `benchmarks/` for reproduction scripts.
 
 **Per-component ablation.** `benchmarks/run_ablation.sh` re-runs the solver over the benchmark sets under several cut/fixing configurations (SEC-only, capacity cuts, Comb/RGLM, reduced-cost fixing on/off, SPI on/off) and writes one row per (config, instance) to `benchmarks/ablation.csv`.
 
