@@ -88,7 +88,7 @@ it**.
 
 - **pre-commit** — `clang-format --dry-run -Werror` over every tracked C++ file. It checks, it does not reformat: run the format command above and commit again. For the Python half it runs `uv run ruff` and `uv run mypy` over the tree, and skips each, saying so, when the venv does not have it (ruff and mypy are not project dependencies). Without a `.venv`, `uv run` first builds one, compiling the extension inside the hook: run `uv sync` once beforehand. No tests at commit.
 - **commit-msg** — Conventional Commits, subject ≤72 chars. `fixup!`/`squash!`/`amend!` pass through so `git rebase --autosquash` works, and `type!:` marks a breaking change (both local edits to wcp's hook).
-- **pre-push** — refuses merge commits on the trunk and a HEAD without a review receipt (`## Self-Review`), then runs the clean/build/test blocks above in a fresh worktree of the pushed commit. That build fetches and compiles HiGHS from scratch, so a push takes minutes. Docs-only pushes skip the build.
+- **pre-push** — refuses merge commits on the trunk and a HEAD without a review receipt (`## Self-Review`), then runs the clean/build/test blocks above in a fresh worktree of the pushed commit. That build fetches and compiles HiGHS from scratch, so a push takes minutes. A push changing only `*.md` files other than CLAUDE.md, LICENSE or `.gitignore` skips the build.
 
 The old hooks also auto-formatted and re-staged (with shfmt and ruff too),
 applied safe clang-tidy fixes, ran the suite at commit, and ran clang-tidy,
@@ -103,7 +103,7 @@ listed in `.git-blame-ignore-revs`; run `git config blame.ignoreRevsFile
 .git-blame-ignore-revs` to have `git blame` skip it.
 
 On a shared machine, pin the local CI to the job budget: `git config
-hooks.localCiCpus 0-3` makes the blocks' `-j$(nproc)` see four CPUs.
+hooks.localCiCpus 0-3` makes the blocks' `-j$(nproc)` see four CPUs, and run the push itself under the machine lock (`xk lock -- git push …`).
 
 ## Hooks Are Files In This Repository
 
