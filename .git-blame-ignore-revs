@@ -1,0 +1,5 @@
+# Formatting-only commits, skipped by `git blame` once configured:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: apply clang-format to the whole tree
+ca124e81d4de5f51595ab98e933bd1132c2cd79f
