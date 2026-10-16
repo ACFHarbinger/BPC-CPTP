@@ -88,7 +88,7 @@ it**.
 
 - **pre-commit** — `clang-format --dry-run -Werror` over every tracked C++ file. It checks, it does not reformat: run the format command above and commit again. For the Python half it runs `uv run ruff` and `uv run mypy` over the tree, and skips each, saying so, when the venv does not have it (ruff and mypy are not project dependencies). Without a `.venv`, `uv run` first builds one, compiling the extension inside the hook: run `uv sync` once beforehand. No tests at commit.
 - **commit-msg** — Conventional Commits, subject ≤72 chars. `fixup!`/`squash!`/`amend!` pass through so `git rebase --autosquash` works, and `type!:` marks a breaking change (both local edits to wcp's hook).
-- **pre-push** — refuses merge commits on the trunk and a HEAD without a review receipt (`## Self-Review`), then runs the clean/build/test blocks above in a fresh worktree of the pushed commit. That build fetches and compiles HiGHS from scratch, so a push takes minutes. A push changing only `*.md` files other than CLAUDE.md, LICENSE or `.gitignore` skips the build.
+- **pre-push** — refuses merge commits on the trunk and a HEAD without a review receipt (`## Self-Review`), then runs the clean/build/test blocks above in a fresh worktree of the pushed commit. That build fetches and compiles HiGHS from scratch, so a push takes minutes. A push changing only `*.md` files (except the root CLAUDE.md, whose blocks are the CI's commands), the root LICENSE or the root `.gitignore` skips the build.
 
 The old hooks also auto-formatted and re-staged (with shfmt and ruff too),
 applied safe clang-tidy fixes, ran the suite at commit, and ran clang-tidy,
