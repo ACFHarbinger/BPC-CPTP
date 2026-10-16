@@ -7,21 +7,20 @@ thread_local HighsUserPropagator::Callback callback_;
 }  // namespace
 
 void HighsUserPropagator::setCallback(Callback cb) {
-  callback_ = std::move(cb);
+    callback_ = std::move(cb);
 }
 
 void HighsUserPropagator::clearCallback() {
-  callback_ = nullptr;
+    callback_ = nullptr;
 }
 
 bool HighsUserPropagator::hasCallback() {
-  return static_cast<bool>(callback_);
+    return static_cast<bool>(callback_);
 }
 
-void HighsUserPropagator::propagate(HighsDomain& domain,
-                                    const HighsMipSolver& mipsolver,
+void HighsUserPropagator::propagate(HighsDomain& domain, const HighsMipSolver& mipsolver,
                                     const HighsLpRelaxation& lp) {
-  if (callback_) {
-    callback_(domain, mipsolver, lp);
-  }
+    if (callback_) {
+        callback_(domain, mipsolver, lp);
+    }
 }

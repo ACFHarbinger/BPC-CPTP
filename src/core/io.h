@@ -1,9 +1,9 @@
 #pragma once
 
+#include "core/problem.h"
+
 #include <filesystem>
 #include <string>
-
-#include "core/problem.h"
 
 namespace cptp::io {
 

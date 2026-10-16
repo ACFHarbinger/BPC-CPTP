@@ -9,9 +9,9 @@ namespace cptp::sep {
 ///   x(delta(S)) >= 2 * ceil(d(S) / Q)
 /// where d(S) = sum of demands in S, Q = vehicle capacity.
 class RCISeparator : public Separator {
- public:
-  std::string name() const override { return "RCI"; }
-  std::vector<Cut> separate(const SeparationContext& ctx) override;
+public:
+    std::string name() const override { return "RCI"; }
+    std::vector<Cut> separate(const SeparationContext& ctx) override;
 };
 
 }  // namespace cptp::sep
