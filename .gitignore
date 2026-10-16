@@ -12,3 +12,5 @@ benchmarks/*.bak
 *.egg-info/
 dist/
 .DS_Store
+# `uv sync` writes one per clone; dependencies are pinned with >= bounds in pyproject.toml.
+uv.lock

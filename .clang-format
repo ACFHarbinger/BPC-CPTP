@@ -1,7 +1,8 @@
+# wcp: config/.clang-format base=6409db2a38be
 ---
 Language: Cpp
 BasedOnStyle: Google
-Standard: c++23
+Standard: Latest
 ColumnLimit: 100
 IndentWidth: 4
 TabWidth: 4
