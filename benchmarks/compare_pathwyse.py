@@ -38,25 +38,17 @@ def _euc2d(x1: float, y1: float, x2: float, y2: float) -> int:
     return int(math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2) + 0.5)
 
 
-def parse_tsplib(filepath: Path) -> dict:
-    """Parse a TSPLIB-format .sppcc or .vrp file.
+_TSPLIB_SECTIONS = {
+    "NODE_COORD_SECTION", "DEMAND_SECTION", "DEPOT_SECTION",
+    "EDGE_WEIGHT_SECTION", "NODE_WEIGHT_SECTION", "PROFIT_SECTION",
+}
 
-    Handles two variants:
-    - SPPRCLIB .sppcc: EDGE_WEIGHT_SECTION (full matrix) + NODE_WEIGHT_SECTION
-    - Roberti .vrp: NODE_COORD_SECTION (EUC_2D) + PROFIT_SECTION
-    """
-    with open(filepath) as f:
-        lines = f.readlines()
 
-    # Parse into sections
+def _read_tsplib_sections(lines: list[str]) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Split a TSPLIB file into header keys and section line lists."""
     header: dict[str, str] = {}
     sections: dict[str, list[str]] = {}
     current_section = None
-
-    section_names = {
-        "NODE_COORD_SECTION", "DEMAND_SECTION", "DEPOT_SECTION",
-        "EDGE_WEIGHT_SECTION", "NODE_WEIGHT_SECTION", "PROFIT_SECTION",
-    }
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -65,14 +57,13 @@ def parse_tsplib(filepath: Path) -> dict:
         if line == "EOF":
             break
 
-        # Check for section headers
-        if line in section_names:
+        if line in _TSPLIB_SECTIONS:
             current_section = line
             sections[current_section] = []
             continue
 
-        # A "KEY : value" header line terminates any open section
-        # Keys contain only uppercase letters, underscores, digits
+        # A "KEY : value" header line terminates any open section.
+        # Keys contain only uppercase letters, underscores, digits.
         pos = line.find(":")
         if pos != -1:
             key_candidate = line[:pos].strip()
@@ -83,18 +74,14 @@ def parse_tsplib(filepath: Path) -> dict:
 
         if current_section is not None:
             sections[current_section].append(line)
+    return header, sections
 
-    n = int(header.get("DIMENSION", 0))
-    capacity = float(header.get("CAPACITY", 0))
-    name = header.get("NAME", filepath.stem)
-    comment = header.get("COMMENT", "")
 
-    # Build distance matrix
+def _distance_matrix(n: int, sections: dict[str, list[str]]) -> list[list[float]]:
+    """Build the distance matrix from an edge-weight section or EUC_2D coordinates."""
     dist: list[list[float]] = [[0.0] * n for _ in range(n)]
-
     if "EDGE_WEIGHT_SECTION" in sections:
-        # Full matrix (SPPRCLIB .sppcc)
-        numbers = []
+        numbers: list[float] = []
         for line in sections["EDGE_WEIGHT_SECTION"]:
             numbers.extend(float(x) for x in line.split())
         assert len(numbers) == n * n, f"Expected {n*n} edge weights, got {len(numbers)}"
@@ -102,7 +89,6 @@ def parse_tsplib(filepath: Path) -> dict:
             for j in range(n):
                 dist[i][j] = numbers[i * n + j]
     elif "NODE_COORD_SECTION" in sections:
-        # EUC_2D coordinates
         coords: list[tuple[float, float]] = []
         for line in sections["NODE_COORD_SECTION"]:
             parts = line.split()
@@ -110,18 +96,17 @@ def parse_tsplib(filepath: Path) -> dict:
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    dist[i][j] = _euc2d(coords[i][0], coords[i][1],
-                                         coords[j][0], coords[j][1])
+                    dist[i][j] = _euc2d(
+                        coords[i][0], coords[i][1], coords[j][0], coords[j][1]
+                    )
+    return dist
 
-    # Node weights / profits (PathWyse node_cost = -profit)
-    # SPPRCLIB: NODE_WEIGHT_SECTION has costs (positive = cost, negative = profit)
-    #           -> node_cost for PathWyse = node_weight (already cost)
-    # Roberti:  PROFIT_SECTION has positive profits
-    #           -> node_cost for PathWyse = -profit
-    node_costs: list[float] = [0.0] * n
 
+def _node_costs(n: int, sections: dict[str, list[str]]) -> list[float]:
+    """PathWyse node costs: SPPRCLIB weights as-is, Roberti profits negated."""
+    node_costs = [0.0] * n
     if "NODE_WEIGHT_SECTION" in sections:
-        values = []
+        values: list[float] = []
         for line in sections["NODE_WEIGHT_SECTION"]:
             values.extend(float(x) for x in line.split())
         for i in range(n):
@@ -130,39 +115,59 @@ def parse_tsplib(filepath: Path) -> dict:
         for line in sections["PROFIT_SECTION"]:
             parts = line.split()
             idx = int(parts[0]) - 1  # 1-indexed
-            profit = float(parts[1])
             if 0 <= idx < n:
-                node_costs[idx] = -profit  # PathWyse: cost = -profit
+                node_costs[idx] = -float(parts[1])
+    return node_costs
 
-    # Demands (1-indexed in TSPLIB)
-    demands: list[float] = [0.0] * n
-    if "DEMAND_SECTION" in sections:
-        for line in sections["DEMAND_SECTION"]:
-            parts = line.split()
-            if len(parts) >= 2:
-                idx = int(parts[0]) - 1
-                if 0 <= idx < n:
-                    demands[idx] = float(parts[1])
 
-    # Depot (0-indexed)
-    depot = 0
-    if "DEPOT_SECTION" in sections:
-        for line in sections["DEPOT_SECTION"]:
-            d = int(line.strip())
-            if d >= 1:
-                depot = d - 1
-                break
+def _demands(n: int, sections: dict[str, list[str]]) -> list[float]:
+    """Read 1-indexed TSPLIB demands into a 0-indexed list."""
+    demands = [0.0] * n
+    if "DEMAND_SECTION" not in sections:
+        return demands
+    for line in sections["DEMAND_SECTION"]:
+        parts = line.split()
+        if len(parts) >= 2:
+            idx = int(parts[0]) - 1
+            if 0 <= idx < n:
+                demands[idx] = float(parts[1])
+    return demands
 
-    # Depot demand = 0
+
+def _depot(sections: dict[str, list[str]]) -> int:
+    """First listed depot, converted from TSPLIB's 1-based index."""
+    if "DEPOT_SECTION" not in sections:
+        return 0
+    for line in sections["DEPOT_SECTION"]:
+        listed = int(line.strip())
+        if listed >= 1:
+            return listed - 1
+    return 0
+
+
+def parse_tsplib(filepath: Path) -> dict:
+    """Parse a TSPLIB-format .sppcc or .vrp file.
+
+    Handles two variants:
+    - SPPRCLIB .sppcc: EDGE_WEIGHT_SECTION (full matrix) + NODE_WEIGHT_SECTION
+    - Roberti .vrp: NODE_COORD_SECTION (EUC_2D) + PROFIT_SECTION
+    """
+    with open(filepath) as f:
+        lines = f.readlines()
+
+    header, sections = _read_tsplib_sections(lines)
+    n = int(header.get("DIMENSION", 0))
+    demands = _demands(n, sections)
+    depot = _depot(sections)
     demands[depot] = 0.0
 
     return {
-        "name": name,
-        "comment": comment,
+        "name": header.get("NAME", filepath.stem),
+        "comment": header.get("COMMENT", ""),
         "dimension": n,
-        "capacity": capacity,
-        "dist": dist,
-        "node_costs": node_costs,
+        "capacity": float(header.get("CAPACITY", 0)),
+        "dist": _distance_matrix(n, sections),
+        "node_costs": _node_costs(n, sections),
         "demands": demands,
         "depot": depot,
     }
@@ -346,6 +351,63 @@ def run_single(pw_bin: Path, instance_path: Path, expected: float | None,
     return result
 
 
+def _instance_paths(target: Path) -> list[Path]:
+    """One file, or every .sppcc and .vrp file in a directory."""
+    if target.is_dir():
+        instances = sorted(target.glob("*.sppcc")) + sorted(target.glob("*.vrp"))
+        if not instances:
+            print(f"No .sppcc or .vrp files found in {target}", file=sys.stderr)
+            sys.exit(1)
+        return instances
+    if target.is_file():
+        return [target]
+    print(f"Error: {target} not found", file=sys.stderr)
+    sys.exit(1)
+
+
+def _batch_mark(result: dict) -> str:
+    """OK, FAIL, TLIM, or ERR for one batch-table row."""
+    if result["obj"] is not None and result["expected"] is not None:
+        if abs(result["obj"] - result["expected"]) < 0.01:
+            return "OK"
+        return "FAIL"
+    if result["status"] == "TIMEOUT":
+        return "TLIM"
+    return "ERR"
+
+
+def _append_results_csv(csv_path: Path, results: list[dict], instance_arg: str, machine: str) -> None:
+    """Append PathWyse rows, writing the header only when the file has no data yet."""
+    write_header = True
+    if csv_path.exists():
+        with open(csv_path) as check:
+            for line in check:
+                if line.strip() and not line.startswith("#"):
+                    write_header = False
+                    break
+    timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    if "roberti" in instance_arg:
+        inst_set = "roberti"
+    elif "spprclib" in instance_arg:
+        inst_set = "spprclib"
+    else:
+        inst_set = "unknown"
+    with open(csv_path, "a", newline="") as handle:
+        writer = csv.writer(handle)
+        if write_header:
+            writer.writerow(["instance", "set", "obj", "time_s", "status", "timestamp", "machine"])
+        for result in results:
+            writer.writerow([
+                result["instance"],
+                inst_set,
+                f"{result['obj']:.6g}" if result["obj"] is not None else "",
+                f"{result['time']:.3f}" if result["time"] is not None else "",
+                result["status"],
+                timestamp,
+                machine,
+            ])
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run PathWyse on instance(s) and verify against known optimal values."
@@ -364,17 +426,7 @@ def main():
         print("Run ./benchmarks/setup_pathwyse.sh first", file=sys.stderr)
         sys.exit(1)
 
-    target = Path(args.instance)
-    if target.is_dir():
-        instances = sorted(target.glob("*.sppcc")) + sorted(target.glob("*.vrp"))
-        if not instances:
-            print(f"No .sppcc or .vrp files found in {target}", file=sys.stderr)
-            sys.exit(1)
-    elif target.is_file():
-        instances = [target]
-    else:
-        print(f"Error: {target} not found", file=sys.stderr)
-        sys.exit(1)
+    instances = _instance_paths(Path(args.instance))
 
     # Table header for batch mode
     batch = len(instances) > 1
@@ -400,19 +452,12 @@ def main():
             time_str = f"{r['time']:.2f}s" if r["time"] else "N/A"
             exp_str = f"{r['expected']:.6g}" if r["expected"] is not None else "N/A"
 
-            match_str = "?"
-            if r["obj"] is not None and r["expected"] is not None:
-                if abs(r["obj"] - r["expected"]) < 0.01:
-                    match_str = "OK"
-                    matches += 1
-                else:
-                    match_str = "FAIL"
-                    mismatches += 1
-            elif r["status"] == "TIMEOUT":
-                match_str = "TLIM"
-                errors += 1
+            match_str = _batch_mark(r)
+            if match_str == "OK":
+                matches += 1
+            elif match_str == "FAIL":
+                mismatches += 1
             else:
-                match_str = "ERR"
                 errors += 1
 
             print(f"{name:<30} {obj_str:>12} {time_str:>10} {exp_str:>12} {match_str:>7}")
@@ -421,41 +466,8 @@ def main():
         print("-" * 73)
         print(f"{matches} match, {mismatches} mismatch, {errors} timeout/error out of {len(instances)}")
 
-    # Write CSV if requested
     if args.csv:
-        csv_path = Path(args.csv)
-        # Write header if the file has no non-comment data lines yet
-        write_header = True
-        if csv_path.exists():
-            with open(csv_path) as check:
-                for line in check:
-                    if line.strip() and not line.startswith("#"):
-                        write_header = False
-                        break
-        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        machine = args.machine or ""
-        with open(csv_path, "a", newline="") as f:
-            writer = csv.writer(f)
-            if write_header:
-                writer.writerow(["instance", "set", "obj", "time_s", "status", "timestamp", "machine"])
-            for r in results:
-                # Infer set from path
-                inst_path = Path(args.instance)
-                if "roberti" in str(inst_path):
-                    inst_set = "roberti"
-                elif "spprclib" in str(inst_path):
-                    inst_set = "spprclib"
-                else:
-                    inst_set = "unknown"
-                writer.writerow([
-                    r["instance"],
-                    inst_set,
-                    f"{r['obj']:.6g}" if r["obj"] is not None else "",
-                    f"{r['time']:.3f}" if r["time"] is not None else "",
-                    r["status"],
-                    timestamp,
-                    machine,
-                ])
+        _append_results_csv(Path(args.csv), results, args.instance, args.machine or "")
 
     if mismatches > 0:
         sys.exit(1)

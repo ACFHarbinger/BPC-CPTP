@@ -6,9 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
-import cptp
-from cptp import Model, Problem, SolveResult, Status, SeparatorStats, load, solve
+from cptp import Model, Problem, SeparatorStats, Status, load, solve
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 BIN_PATH = Path(__file__).resolve().parents[2] / "build" / "cptp-solve"

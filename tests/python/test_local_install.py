@@ -26,10 +26,7 @@ def test_local_editable_install_and_use(tmp_path: Path):
     venv_dir = tmp_path / "venv"
     subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True, timeout=120)
 
-    if os.name == "nt":
-        py_exe = venv_dir / "Scripts" / "python.exe"
-    else:
-        py_exe = venv_dir / "bin" / "python"
+    py_exe = venv_dir / "Scripts" / "python.exe" if os.name == "nt" else venv_dir / "bin" / "python"
 
     pip_env = dict(os.environ)
     pip_env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"

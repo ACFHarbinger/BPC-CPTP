@@ -3,12 +3,14 @@
 import argparse
 import sys
 
-from cptp._cptp import Model, load as _load
+from cptp._cptp import Model
+from cptp._cptp import load as _load
 
 
 def _rebuild_with_endpoints(problem, source, target):
     """Rebuild a Problem with overridden source/target."""
     import numpy as np
+
     from cptp._cptp import Problem
 
     return Problem(
