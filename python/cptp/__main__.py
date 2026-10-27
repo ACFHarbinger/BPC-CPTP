@@ -3,15 +3,15 @@
 import argparse
 import sys
 
-from cptp._cptp import Model
-from cptp._cptp import load as _load
+from cptp._cptp import Model  # pyrefly: ignore[missing-import]  # native extension built by CMake
+from cptp._cptp import load as _load  # pyrefly: ignore[missing-import]  # native extension built by CMake
 
 
 def _rebuild_with_endpoints(problem, source, target):
     """Rebuild a Problem with overridden source/target."""
     import numpy as np
 
-    from cptp._cptp import Problem
+    from cptp._cptp import Problem  # pyrefly: ignore[missing-import]  # native extension built by CMake
 
     return Problem(
         num_nodes=problem.num_nodes,

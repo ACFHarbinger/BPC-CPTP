@@ -1,4 +1,4 @@
-from cptp._cptp import (
+from cptp._cptp import (  # pyrefly: ignore[missing-import]  # native extension built by CMake
     # Solver API
     Model,
     # Core types

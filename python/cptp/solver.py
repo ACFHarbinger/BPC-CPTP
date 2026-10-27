@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from cptp._cptp import Model as _Model
-from cptp._cptp import SolveResult
+from cptp._cptp import Model as _Model  # pyrefly: ignore[missing-import]  # native extension built by CMake
+from cptp._cptp import SolveResult  # pyrefly: ignore[missing-import]  # native extension built by CMake
 
 
 def solve(
